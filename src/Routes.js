@@ -6,10 +6,11 @@ import NextRouter from 'next/router';
 import Route from './Route';
 
 export default class Routes {
-  constructor({ Link = NextLink, Router = NextRouter } = {}) {
+  constructor({ Link = NextLink, Router = NextRouter, logger } = {}) {
     this.routes = [];
     this.Link = this.getLink(Link);
     this.Router = this.getRouter(Router);
+    this.logger = logger || console;
   }
 
   add(name, pattern, page) {
@@ -68,7 +69,11 @@ export default class Routes {
     const route = this.findByName(nameOrUrl);
 
     if (route) {
-      return { route, urls: route.getUrls(params), byName: true };
+      return {
+        route,
+        urls: route.getUrls(params),
+        byName: true,
+      };
     } else {
       const { route, query } = this.match(nameOrUrl);
       const href = route ? route.getHref(query) : nameOrUrl;
@@ -98,12 +103,23 @@ export default class Routes {
   getLink(Link) {
     return props => {
       const { route, params, to, hash, ...newProps } = props;
+      let href;
+      let as;
 
-      const { href, as } = this.findAndGetUrls(route || to, params).urls;
+      try {
+        const urls = this.findAndGetUrls(route || to, params).urls;
 
-      return (
-        <Link {...newProps} href={href} as={as + (hash ? `#${hash}` : '')} />
-      );
+        href = urls.href;
+        as = urls.as + (hash ? `#${hash}` : '');
+      } catch (err) {
+        this.logger.error(
+          `Link url composing failed. route="${route ||
+            to}", params: ${JSON.stringify(params)},`,
+          err
+        );
+      }
+
+      return <Link {...newProps} href={href} as={as} />;
     };
   }
 
